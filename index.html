@@ -70,7 +70,8 @@ nav button[aria-selected="true"]{background:var(--ink);color:var(--paper);border
 @keyframes pulse{50%{opacity:.25}}
 @media (prefers-reduced-motion: reduce){.talk .big::after{animation:none}.talk{transition:none}}
 
-.tools{display:flex;gap:8px;margin-top:10px}
+.tools{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.tools button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .tools button{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px;font-weight:500}
 .typed{display:flex;gap:8px;margin-top:8px}
 .typed input{flex:1;min-width:0;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px}
@@ -141,7 +142,8 @@ td.num{font-family:var(--display);font-size:19px;font-weight:600;white-space:now
     </button>
     <div class="tools">
       <button id="undo">Annuler le dernier</button>
-      <button id="toggleType">Saisir au clavier</button>
+      <button id="buds" aria-pressed="false">Écouteurs : off</button>
+      <button id="toggleType">Clavier</button>
     </div>
     <form class="typed" id="typed" hidden>
       <input id="typedIn" placeholder="ex. deuxième coup fer 7 rough gauche" autocomplete="off">
@@ -170,11 +172,12 @@ td.num{font-family:var(--display);font-size:19px;font-weight:600;white-space:now
       <h2>Annonces reconnues</h2>
       <p><code>Drive trou 1</code> démarre le trou 1 au driver.</p>
       <p><code>Deuxième coup fer 7 rough à gauche</code> note le coup, le club et tout ce que tu dis.</p>
-      <p><code>Bois 3</code>, <code>hybride 4</code>, <code>pitching</code>, <code>sand</code>, <code>56 degrés</code>, <code>putt</code> ou <code>putter</code> : le numéro de coup suit automatiquement.</p>
+      <p><code>Bois 3</code>, <code>hybride 4</code>, <code>pitching</code>, <code>sand</code>, <code>56</code> ou <code>56 degrés</code>, <code>putt</code> ou <code>putter</code> : le numéro de coup suit automatiquement.</p>
       <p><code>Sur le green</code> mesure l'approche sans compter de coup.</p>
       <p><code>Trou terminé en 5, deux putts</code> clôt le trou ; le suivant commence au prochain drive. <code>Deux putts</code> seul clôt aussi le trou en ajoutant les putts aux coups notés.</p>
       <p><code>Balle perdue</code> ou toute autre phrase sans club est gardée comme note.</p>
       <p><code>Annule</code> supprime la dernière annonce.</p>
+      <p>Avec <b>Écouteurs : on</b>, un pincement sur l'AirPod lance l'écoute et deux pincements annulent la dernière annonce.</p>
     </div>
   </section>
 </div>
@@ -193,8 +196,12 @@ const NUM = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept
 
 function normalize(s) {
   let t = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’'`\-,.;:!?]/g, ' ').replace(/\s+/g, ' ').trim();
+    .replace(/[’'`\-,.;:!?°]/g, ' ').replace(/\s+/g, ' ').trim();
   for (const [re, v] of NUM_MULTI) t = t.replace(re, v);
+  const TENS = { quarante: 40, cinquante: 50, soixante: 60 };
+  const UNITS = { un: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9 };
+  t = t.replace(/\b(quarante|cinquante|soixante)(?: et)?(?: (un|deux|trois|quatre|cinq|six|sept|huit|neuf))?\b/g,
+    (_, d, u) => String(TENS[d] + (u ? UNITS[u] : 0)));
   t = t.replace(/\b[a-z]+\b/g, w => ORD[w] ? ORD[w] + 'e' : (NUM[w] !== undefined ? String(NUM[w]) : w));
   t = t.replace(/\b(\d{1,2}) ?(er|ere|e|eme|ieme|nd|nde)\b/g, '$1e');
   return t;
@@ -219,7 +226,7 @@ function parseCommand(raw) {
   if (m && (endWords || /coups?\b/.test(t))) r.score = +m[1];
   if (r.score !== null || endWords || puttsOnly) { r.type = 'end'; return r; }
 
-  m = t.match(/\bcoup (\d{1,2})\b/) || t.match(/\b(\d{1,2})e coup\b/) || t.match(/\b(\d{1,2})e (?=(?:au |a |avec )?(?:fer|bois|driver|drive|hybride|putt|pute|put|putter|roule|wedge|pitch|sand|lob|gap))/);
+  m = t.match(/\b(\d{1,2})e coup\b/) || t.match(/\bcoup (1[0-5]|[1-9])\b/) || t.match(/\b(\d{1,2})e coup\b/) || t.match(/\b(\d{1,2})e (?=(?:au |a |avec )?(?:fer|bois|driver|drive|hybride|putt|pute|put|putter|roule|wedge|pitch|sand|lob|gap))/);
   if (m) r.stroke = +m[1];
 
   const clubRules = [
@@ -230,6 +237,7 @@ function parseCommand(raw) {
     [/\b(?:fer|faire|fair|ferre) (\d)\b/, x => 'Fer ' + x[1]],
     [/\bwedge (\d{2})\b/, x => 'Wedge ' + x[1]],
     [/\b(\d{2}) degres?\b/, x => 'Wedge ' + x[1]],
+    [/\b(4[6-9]|5\d|6[0-4])\b(?! ?(?:m|metres?|yards?|yds?|pas|pieds?|cm|%|km))/, x => 'Wedge ' + x[1]],
     [/\b(pitching|pitch|pw)\b/, () => 'PW'],
     [/\b(gap|gw|approach wedge|aw)\b/, () => 'GW'],
     [/\b(sand|sandwedge|sw)\b/, () => 'SW'],
@@ -399,7 +407,7 @@ async function handleText(alternatives){
   say(out.speak);
 }
 
-$('talk').addEventListener('click', () => {
+function startTalk(){
   keepAwake();
   if (!SR){ showLast('Reconnaissance vocale indisponible', 'Ouvre la page dans Chrome, ou utilise la saisie au clavier.', true); return; }
   if (listening){ rec && rec.stop(); return; }
@@ -422,12 +430,51 @@ $('talk').addEventListener('click', () => {
       || ['Erreur de reconnaissance', e.error];
     showLast(msg[0], msg[1], true);
   };
-  rec.onend = () => { setListening(false); if (!got) { pendingPos = null; showLast('Rien entendu', 'Touche le bouton et parle tout de suite après.', true); } };
+  rec.onend = () => { setListening(false); resumeSilence(); if (!got) { pendingPos = null; showLast('Rien entendu', 'Touche le bouton et parle tout de suite après.', true); } };
   try { rec.start(); setListening(true); if (navigator.vibrate) navigator.vibrate(30); }
   catch(e){ setListening(false); showLast('Micro occupé', 'Réessaie dans une seconde.', true); }
-});
+}
+$('talk').addEventListener('click', startTalk);
+
+// ---- Déclenchement par les écouteurs Bluetooth (AirPods : pincement) ----
+// Chrome ne transmet les boutons des écouteurs qu'à une page qui joue du son :
+// on joue donc un silence en boucle et on intercepte lecture/pause.
+let silence = null, budsOn = false;
+function makeSilence(){
+  const rate = 8000, secs = 10, n = rate * secs, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+  a.loop = true; return a;
+}
+function resumeSilence(){ if (budsOn && silence && silence.paused) silence.play().catch(() => {}); }
+async function toggleBuds(){
+  const btn = $('buds');
+  if (budsOn){
+    budsOn = false; silence && silence.pause();
+    ['play','pause','nexttrack','previoustrack'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, null); } catch(e){} });
+    btn.textContent = 'Écouteurs : off'; btn.setAttribute('aria-pressed', 'false'); return;
+  }
+  if (!('mediaSession' in navigator)){ showLast('Écouteurs non pris en charge', 'Ce navigateur ne transmet pas les boutons des écouteurs.', true); return; }
+  silence = silence || makeSilence();
+  try { await silence.play(); } catch(e){ showLast('Lecture bloquée', 'Touche à nouveau le bouton Écouteurs.', true); return; }
+  navigator.mediaSession.metadata = new MediaMetadata({ title: 'Caddie', artist: 'Pince pour annoncer un coup' });
+  const trigger = () => { resumeSilence(); navigator.mediaSession.playbackState = 'playing'; startTalk(); };
+  navigator.mediaSession.setActionHandler('play', trigger);
+  navigator.mediaSession.setActionHandler('pause', trigger);
+  navigator.mediaSession.setActionHandler('nexttrack', () => { const out = apply({ type: 'undo' }); showLast(out.title, out.detail); say(out.speak); });
+  try { navigator.mediaSession.setActionHandler('previoustrack', null); } catch(e){}
+  navigator.mediaSession.playbackState = 'playing';
+  budsOn = true; keepAwake();
+  btn.textContent = 'Écouteurs : on'; btn.setAttribute('aria-pressed', 'true');
+  showLast('Écouteurs activés', 'Un pincement pour annoncer, deux pincements pour annuler.');
+}
 
 $('undo').addEventListener('click', () => { const out = apply({ type: 'undo' }); showLast(out.title, out.detail); });
+$('buds').addEventListener('click', toggleBuds);
 $('toggleType').addEventListener('click', () => { const f = $('typed'); f.hidden = !f.hidden; if (!f.hidden) $('typedIn').focus(); });
 $('typed').addEventListener('submit', e => {
   e.preventDefault(); const v = $('typedIn').value.trim(); if (!v) return;
