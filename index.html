@@ -340,9 +340,9 @@ function apply(cmd, pos){
   let detail = '', dist = null;
   if (prev && ev.lat != null) { dist = Math.round(haversine(prev, ev)); detail = `${prev.club || 'Coup précédent'} : ${dist} m`; }
   if (ev.lat == null) detail = 'Pas de position GPS pour cette annonce';
-  const speak = ev.type === 'shot' ? `${ev.club || 'Coup'}, coup ${ev.stroke}${dist != null && prev?.type === 'shot' ? ', précédent ' + dist + ' mètres' : ''}`
+  const speak = ev.type === 'shot' ? `Trou ${hole}, coup ${ev.stroke}${ev.club ? ', ' + ev.club.replace(/^PW$/, 'pitching').replace(/^GW$/, 'gap wedge').replace(/^SW$/, 'sand wedge').replace(/^LW$/, 'lob wedge') : ''}${dist != null && prev?.type === 'shot' ? ', précédent ' + dist + ' mètres' : ''}`
     : ev.type === 'end' ? `Trou ${hole} en ${ev.score}`
-    : ev.type === 'green' ? `Sur le green${dist != null ? ', ' + dist + ' mètres' : ''}` : 'Note enregistrée';
+    : ev.type === 'green' ? `Trou ${hole}, sur le green${dist != null ? ', ' + dist + ' mètres' : ''}` : `Trou ${hole}, note enregistrée`;
   return { title: describe(ev), detail, speak };
 }
 function previousWithPos(h){
@@ -350,7 +350,7 @@ function previousWithPos(h){
     const e = round.events[i];
     if (e.hole !== h) return null;
     if (e.type === 'shot' && e.lat != null) return e;
-    if (e.type === 'end') return null;
+    if (e.type === 'end' || e.type === 'green') return null;
   }
   return null;
 }
