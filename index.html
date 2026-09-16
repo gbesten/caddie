@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caddie</title>
+<meta name="theme-color" content="#123A2B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBFCF8; --ink:#123A2B; --pencil:#5A6A61; --line:#D5DDD6; --turf:#2E7A4E;
+  --turf-press:#24613E; --flag:#C8322B; --sand:#E9DFC4; --panel:#FFFFFF;
+  --display:'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --text:'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1F18; --ink:#E8F0EA; --pencil:#9AAEA3; --line:#284237; --turf:#3A9A63;
+    --turf-press:#2F8053; --flag:#E0544C; --sand:#3A3526; --panel:#15291F;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1F18; --ink:#E8F0EA; --pencil:#9AAEA3; --line:#284237; --turf:#3A9A63;
+  --turf-press:#2F8053; --flag:#E0544C; --sand:#3A3526; --panel:#15291F;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--text);font-size:17px;line-height:1.45;
+  -webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button,input{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--turf);outline-offset:2px}
+
+.app{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
+  padding:max(10px,env(safe-area-inset-top)) 14px max(12px,env(safe-area-inset-bottom))}
+
+nav{display:flex;gap:6px;margin-bottom:10px}
+nav button{flex:1;border:1px solid var(--line);background:transparent;border-radius:10px;padding:9px 0;
+  font-weight:600;color:var(--pencil);white-space:nowrap;font-size:15px}
+nav button[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* Tableau de marque */
+.board{display:grid;grid-template-columns:1fr 1fr auto;align-items:end;gap:10px;
+  border-bottom:2px solid var(--ink);padding:4px 2px 10px}
+.stat small{display:block;color:var(--pencil);font-size:14px}
+.stat b{font-family:var(--display);font-weight:700;font-size:64px;line-height:.9;letter-spacing:-.5px}
+.gps{text-align:right;font-size:14px;color:var(--pencil);padding-bottom:6px}
+.gps i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--pencil);margin-right:6px;vertical-align:middle}
+.gps.good i{background:var(--turf)} .gps.poor i{background:#D39B2A} .gps.none i{background:var(--flag)}
+
+.last{padding:12px 2px;min-height:96px}
+.last .said{color:var(--pencil);font-size:15px}
+.last .what{font-family:var(--display);font-size:30px;font-weight:600;line-height:1.1;margin-top:2px}
+.last .dist{font-size:15px;margin-top:2px}
+.last.err .what{color:var(--flag)}
+
+/* Le bouton */
+.talk{flex:1;min-height:42vh;width:100%;border:0;border-radius:28px;background:var(--turf);color:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  touch-action:manipulation;user-select:none;transition:background .15s, transform .08s}
+.talk:active{transform:scale(.985);background:var(--turf-press)}
+.talk .big{font-family:var(--display);font-size:56px;font-weight:700;letter-spacing:.5px}
+.talk .hint{font-size:16px;opacity:.9;max-width:28ch;text-align:center}
+.talk.listening{background:var(--flag)}
+.talk.listening .big::after{content:'';display:inline-block;width:14px;height:14px;border-radius:50%;
+  background:#fff;margin-left:12px;vertical-align:middle;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion: reduce){.talk .big::after{animation:none}.talk{transition:none}}
+
+.tools{display:flex;gap:8px;margin-top:10px}
+.tools button{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px;font-weight:500}
+.typed{display:flex;gap:8px;margin-top:8px}
+.typed input{flex:1;min-width:0;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px}
+.typed button{border:0;background:var(--ink);color:var(--paper);border-radius:10px;padding:0 14px;font-weight:600}
+
+/* Journal & compte rendu */
+h2{font-family:var(--display);font-weight:700;font-size:30px;margin:14px 0 6px}
+h3{font-family:var(--display);font-weight:600;font-size:22px;margin:0}
+.muted{color:var(--pencil)}
+.log{list-style:none;margin:0;padding:0}
+.log li{display:grid;grid-template-columns:52px 1fr auto;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);align-items:center}
+.log .n{font-family:var(--display);font-size:22px;font-weight:600;line-height:1}
+.log .n small{display:block;font-family:var(--text);font-size:12px;color:var(--pencil);font-weight:400}
+.log .desc{font-size:15px}
+.log .desc b{font-weight:600;font-size:17px}
+.log button{border:0;background:transparent;color:var(--pencil);padding:8px;font-size:14px}
+
+.hole{border:1px solid var(--line);border-radius:14px;background:var(--panel);margin:10px 0;overflow:hidden}
+.hole header{display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;border-bottom:1px solid var(--line)}
+.hole .score{font-family:var(--display);font-size:28px;font-weight:700}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{padding:7px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:500;color:var(--pencil);font-size:13px}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--display);font-size:19px;font-weight:600;white-space:nowrap;text-align:right}
+
+.summary{display:grid;grid-template-columns:repeat(3,1fr);border:2px solid var(--ink);border-radius:14px;margin:8px 0}
+.summary div{padding:10px 12px;border-right:1px solid var(--line)} .summary div:last-child{border-right:0}
+.summary b{display:block;font-family:var(--display);font-size:40px;line-height:1;font-weight:700}
+.summary small{color:var(--pencil);font-size:13px}
+
+.clubs td.bar{width:40%}
+.clubs .track{height:10px;background:var(--sand);border-radius:5px;margin-top:6px}
+.clubs .fill{height:100%;background:var(--turf);border-radius:5px}
+
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.row button,.row label{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px;font-weight:500;cursor:pointer}
+.row .danger{color:var(--flag)}
+.field{display:flex;flex-direction:column;gap:4px;margin:8px 0}
+.field input{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px}
+.help p{margin:6px 0} .help code{font-family:var(--text);font-weight:600;background:var(--sand);padding:1px 6px;border-radius:5px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav role="tablist">
+    <button role="tab" data-view="play" aria-selected="true">Partie</button>
+    <button role="tab" data-view="log" aria-selected="false">Journal</button>
+    <button role="tab" data-view="report" aria-selected="false">Bilan</button>
+  </nav>
+
+  <!-- PARTIE -->
+  <section id="play" style="display:flex;flex-direction:column;flex:1">
+    <div class="board">
+      <div class="stat"><small>Trou</small><b id="bHole">1</b></div>
+      <div class="stat"><small>Coup</small><b id="bStroke">1</b></div>
+      <div class="gps none" id="gps"><i></i><span id="gpsTxt">GPS en attente</span></div>
+    </div>
+    <div class="last" id="last" aria-live="polite">
+      <div class="said">Touche le bouton, puis annonce ton coup.</div>
+      <div class="what">Exemple : « Drive trou 1 »</div>
+    </div>
+    <button class="talk" id="talk" aria-label="Annoncer un coup">
+      <span class="big" id="talkBig">Parler</span>
+      <span class="hint" id="talkHint">Ta position est prise au moment où tu touches</span>
+    </button>
+    <div class="tools">
+      <button id="undo">Annuler le dernier</button>
+      <button id="toggleType">Saisir au clavier</button>
+    </div>
+    <form class="typed" id="typed" hidden>
+      <input id="typedIn" placeholder="ex. deuxième coup fer 7 rough gauche" autocomplete="off">
+      <button type="submit">Noter</button>
+    </form>
+  </section>
+
+  <!-- JOURNAL -->
+  <section id="log" hidden>
+    <h2>Journal</h2>
+    <p class="muted" id="logEmpty">Aucune annonce pour l'instant.</p>
+    <ul class="log" id="logList"></ul>
+  </section>
+
+  <!-- COMPTE RENDU -->
+  <section id="report" hidden>
+    <div class="field"><label for="course">Parcours</label><input id="course" placeholder="Nom du parcours"></div>
+    <div id="reportBody"></div>
+    <div class="row">
+      <button id="expJson">Exporter JSON</button>
+      <button id="expCsv">Exporter CSV</button>
+      <label>Importer<input type="file" id="imp" accept="application/json" hidden></label>
+      <button id="newRound" class="danger">Nouvelle partie</button>
+    </div>
+    <div class="help">
+      <h2>Annonces reconnues</h2>
+      <p><code>Drive trou 1</code> démarre le trou 1 au driver.</p>
+      <p><code>Deuxième coup fer 7 rough à gauche</code> note le coup, le club et tout ce que tu dis.</p>
+      <p><code>Bois 3</code>, <code>hybride 4</code>, <code>pitching</code>, <code>sand</code>, <code>56 degrés</code>, <code>putt</code> : le numéro de coup suit automatiquement.</p>
+      <p><code>Sur le green</code> mesure l'approche sans compter de coup.</p>
+      <p><code>Trou terminé en 5, deux putts</code> clôt le trou ; le suivant commence au prochain drive.</p>
+      <p><code>Balle perdue</code> ou toute autre phrase sans club est gardée comme note.</p>
+      <p><code>Annule</code> supprime la dernière annonce.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+// ---- Analyse des annonces vocales (français) ----
+const NUM_MULTI = [
+  [/\bdix[ -]sept\b/g, '17'], [/\bdix[ -]huit\b/g, '18'], [/\bdix[ -]neuf\b/g, '19'],
+  [/\bdix[ -]septieme\b/g, '17e'], [/\bdix[ -]huitieme\b/g, '18e']
+];
+const ORD = { premier: 1, premiere: 1, second: 2, seconde: 2, deuxieme: 2, troisieme: 3, quatrieme: 4,
+  cinquieme: 5, sixieme: 6, septieme: 7, huitieme: 8, neuvieme: 9, dixieme: 10, onzieme: 11,
+  douzieme: 12, treizieme: 13, quatorzieme: 14, quinzieme: 15, seizieme: 16 };
+const NUM = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, set: 7, cette: 7,
+  huit: 8, neuf: 9, dix: 10, onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16 };
+
+function normalize(s) {
+  let t = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’'`\-,.;:!?]/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const [re, v] of NUM_MULTI) t = t.replace(re, v);
+  t = t.replace(/\b[a-z]+\b/g, w => ORD[w] ? ORD[w] + 'e' : (NUM[w] !== undefined ? String(NUM[w]) : w));
+  t = t.replace(/\b(\d{1,2}) ?(er|ere|e|eme|ieme|nd|nde)\b/g, '$1e');
+  return t;
+}
+
+function parseCommand(raw) {
+  const t = normalize(raw);
+  const r = { raw, text: t, type: null, hole: null, stroke: null, club: null, score: null, putts: null };
+
+  if (/\b(annule|annuler|efface|effacer|supprime|supprimer)\b/.test(t)) { r.type = 'undo'; return r; }
+
+  let m = t.match(/\btrou (?:numero |n )?(\d{1,2})\b/);
+  if (m) r.hole = +m[1];
+
+  m = t.match(/\b(\d) putts?\b/);
+  if (m) r.putts = +m[1];
+
+  m = t.match(/\b(?:termine|terminee|fini|finit|finie|sorti|sortie|fait)\w* (?:en )?(\d{1,2})\b/)
+    || t.match(/\ben (\d{1,2}) coups?\b/);
+  const endWords = /\b(termine|fini|finit|sorti|dans le trou|rentre|trou fini|trou termine)\b/.test(t);
+  if (m && (endWords || /coups?\b/.test(t))) r.score = +m[1];
+  if (r.score !== null || endWords) { r.type = 'end'; return r; }
+
+  m = t.match(/\bcoup (\d{1,2})\b/) || t.match(/\b(\d{1,2})e coup\b/) || t.match(/\b(\d{1,2})e (?=(?:au |a |avec )?(?:fer|bois|driver|drive|hybride|putt|wedge|pitch|sand|lob|gap))/);
+  if (m) r.stroke = +m[1];
+
+  const clubRules = [
+    [/\bdriv(e|er)\b/, () => 'Driver'],
+    [/\bbois (\d)\b/, x => 'Bois ' + x[1]],
+    [/\b(?:hybride|hybrid|rescue) (\d)\b/, x => 'Hybride ' + x[1]],
+    [/\b(?:hybride|hybrid|rescue)\b/, () => 'Hybride'],
+    [/\b(?:fer|faire|fair|ferre) (\d)\b/, x => 'Fer ' + x[1]],
+    [/\bwedge (\d{2})\b/, x => 'Wedge ' + x[1]],
+    [/\b(\d{2}) degres?\b/, x => 'Wedge ' + x[1]],
+    [/\b(pitching|pitch|pw)\b/, () => 'PW'],
+    [/\b(gap|gw|approach wedge|aw)\b/, () => 'GW'],
+    [/\b(sand|sandwedge|sw)\b/, () => 'SW'],
+    [/\b(lob|lw)\b/, () => 'LW'],
+    [/\bputt(er|s)?\b/, () => 'Putter'],
+    [/\bwedge\b/, () => 'Wedge']
+  ];
+  for (const [re, fn] of clubRules) { const x = t.match(re); if (x) { r.club = fn(x); break; } }
+
+  if (/\bsur le green\b|\bau green\b|\bon green\b/.test(t) && !r.club) { r.type = 'green'; return r; }
+  if (r.club || r.stroke !== null) { r.type = 'shot'; if (r.club === 'Driver' && r.stroke === null && /\bdrive\b/.test(t)) r.isDrive = true; return r; }
+  r.type = 'note';
+  return r;
+}
+
+
+
+
+// ---- État ----
+const KEY = 'caddie.round.v1';
+let round = load();
+function blank(){ return { id: Date.now(), date: new Date().toISOString(), course: '', events: [] }; }
+function load(){ try { const r = JSON.parse(localStorage.getItem(KEY)); if (r && Array.isArray(r.events)) return r; } catch(e){} return blank(); }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(round)); } catch(e){ showLast('Stockage impossible', 'Exporte la partie pour ne rien perdre.', true); } }
+
+const $ = id => document.getElementById(id);
+
+// ---- Position ----
+let fix = null;
+function gpsUI(){
+  const el = $('gps');
+  if (!fix){ el.className = 'gps none'; $('gpsTxt').textContent = 'GPS en attente'; return; }
+  const a = Math.round(fix.acc);
+  el.className = 'gps ' + (a <= 10 ? 'good' : 'poor');
+  $('gpsTxt').textContent = '± ' + a + ' m';
+}
+function startWatch(){
+  if (!('geolocation' in navigator)) { $('gpsTxt').textContent = 'GPS indisponible'; return; }
+  navigator.geolocation.watchPosition(p => {
+    fix = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
+    gpsUI();
+  }, err => {
+    $('gps').className = 'gps none';
+    $('gpsTxt').textContent = err.code === 1 ? 'Localisation refusée' : 'GPS sans signal';
+  }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+}
+function positionNow(){
+  return new Promise(res => {
+    if (fix && Date.now() - fix.t < 5000 && fix.acc <= 15) return res({ ...fix });
+    if (!('geolocation' in navigator)) return res(fix ? { ...fix } : null);
+    navigator.geolocation.getCurrentPosition(
+      p => res({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() }),
+      () => res(fix ? { ...fix } : null),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 });
+  });
+}
+function haversine(a, b){
+  const R = 6371000, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// ---- Écran toujours allumé ----
+let wake = null;
+async function keepAwake(){
+  try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => wake = null); } } catch(e){}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+
+// ---- Logique de partie ----
+function currentHole(){
+  const ev = round.events;
+  if (!ev.length) return 1;
+  const last = ev[ev.length - 1];
+  return last.type === 'end' ? last.hole + 1 : last.hole;
+}
+function shotsOn(h){ return round.events.filter(e => e.hole === h && e.type === 'shot'); }
+function holeEnded(h){ return round.events.some(e => e.hole === h && e.type === 'end'); }
+
+function apply(cmd, pos){
+  if (cmd.type === 'undo'){
+    const gone = round.events.pop(); save(); render();
+    return gone ? { title: 'Annulé', detail: describe(gone), speak: 'Annulé' } : { title: 'Rien à annuler', detail: '', speak: 'Rien à annuler' };
+  }
+  let hole = cmd.hole ?? currentHole();
+  const ev = { id: Date.now() + Math.random(), type: cmd.type, hole, raw: cmd.raw, t: Date.now(),
+    lat: pos?.lat ?? null, lon: pos?.lon ?? null, acc: pos?.acc ?? null };
+
+  if (cmd.type === 'shot'){
+    ev.stroke = cmd.stroke ?? (shotsOn(hole).length + 1);
+    ev.club = cmd.club;
+  } else if (cmd.type === 'end'){
+    ev.score = cmd.score ?? shotsOn(hole).length;
+    ev.putts = cmd.putts;
+  }
+  const prev = previousWithPos(hole);
+  round.events.push(ev); save(); render();
+
+  let detail = '', dist = null;
+  if (prev && ev.lat != null) { dist = Math.round(haversine(prev, ev)); detail = `${prev.club || 'Coup précédent'} : ${dist} m`; }
+  if (ev.lat == null) detail = 'Pas de position GPS pour cette annonce';
+  const speak = ev.type === 'shot' ? `${ev.club || 'Coup'}, coup ${ev.stroke}${dist != null && prev?.type === 'shot' ? ', précédent ' + dist + ' mètres' : ''}`
+    : ev.type === 'end' ? `Trou ${hole} en ${ev.score}`
+    : ev.type === 'green' ? `Sur le green${dist != null ? ', ' + dist + ' mètres' : ''}` : 'Note enregistrée';
+  return { title: describe(ev), detail, speak };
+}
+function previousWithPos(h){
+  for (let i = round.events.length - 1; i >= 0; i--){
+    const e = round.events[i];
+    if (e.hole !== h) return null;
+    if (e.type === 'shot' && e.lat != null) return e;
+    if (e.type === 'end') return null;
+  }
+  return null;
+}
+function describe(e){
+  if (e.type === 'shot') return `Trou ${e.hole}, coup ${e.stroke}${e.club ? ' · ' + e.club : ''}`;
+  if (e.type === 'end') return `Trou ${e.hole} terminé en ${e.score}${e.putts ? ' (' + e.putts + ' putts)' : ''}`;
+  if (e.type === 'green') return `Trou ${e.hole} · sur le green`;
+  return `Trou ${e.hole} · note`;
+}
+
+// ---- Voix ----
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, pendingPos = null;
+function say(txt){
+  try { if (!('speechSynthesis' in window)) return; speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(txt); u.lang = 'fr-FR'; u.rate = 1.05; speechSynthesis.speak(u); } catch(e){}
+}
+function showLast(title, detail, err, said){
+  const el = $('last'); el.classList.toggle('err', !!err);
+  el.innerHTML = '';
+  const s = document.createElement('div'); s.className = 'said'; s.textContent = said ? '« ' + said + ' »' : ' ';
+  const w = document.createElement('div'); w.className = 'what'; w.textContent = title;
+  const d = document.createElement('div'); d.className = 'dist'; d.textContent = detail || '';
+  el.append(s, w, d);
+}
+function setListening(on){
+  listening = on;
+  $('talk').classList.toggle('listening', on);
+  $('talkBig').textContent = on ? "J'écoute" : 'Parler';
+  $('talkHint').textContent = on ? 'Touche encore pour arrêter' : 'Ta position est prise au moment où tu touches';
+}
+async function handleText(alternatives){
+  let chosen = null;
+  for (const a of alternatives){ const c = parseCommand(a); if (c.type !== 'note'){ chosen = c; break; } }
+  if (!chosen) chosen = parseCommand(alternatives[0]);
+  const pos = await (pendingPos || positionNow());
+  pendingPos = null;
+  const out = apply(chosen, pos);
+  showLast(out.title, out.detail, false, chosen.raw);
+  if (navigator.vibrate) navigator.vibrate(60);
+  say(out.speak);
+}
+
+$('talk').addEventListener('click', () => {
+  keepAwake();
+  if (!SR){ showLast('Reconnaissance vocale indisponible', 'Ouvre la page dans Chrome, ou utilise la saisie au clavier.', true); return; }
+  if (listening){ rec && rec.stop(); return; }
+  pendingPos = positionNow();           // la position est figée au moment du toucher
+  try { speechSynthesis.cancel(); } catch(e){}
+  rec = new SR();
+  rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 4; rec.continuous = false;
+  let got = false;
+  rec.onresult = e => {
+    got = true;
+    const alts = Array.from(e.results[0]).map(a => a.transcript.trim()).filter(Boolean);
+    if (alts.length) handleText(alts);
+  };
+  rec.onerror = e => {
+    got = true; pendingPos = null;
+    const msg = { 'not-allowed': ['Micro refusé', 'Autorise le micro pour ce site dans les réglages de Chrome.'],
+      'no-speech': ['Rien entendu', 'Touche le bouton et parle tout de suite après.'],
+      'network': ['Pas de réseau', 'La reconnaissance vocale a besoin de données mobiles. Utilise la saisie au clavier.'],
+      'audio-capture': ['Micro introuvable', 'Vérifie qu\'aucune autre app n\'utilise le micro.'] }[e.error]
+      || ['Erreur de reconnaissance', e.error];
+    showLast(msg[0], msg[1], true);
+  };
+  rec.onend = () => { setListening(false); if (!got) { pendingPos = null; showLast('Rien entendu', 'Touche le bouton et parle tout de suite après.', true); } };
+  try { rec.start(); setListening(true); if (navigator.vibrate) navigator.vibrate(30); }
+  catch(e){ setListening(false); showLast('Micro occupé', 'Réessaie dans une seconde.', true); }
+});
+
+$('undo').addEventListener('click', () => { const out = apply({ type: 'undo' }); showLast(out.title, out.detail); });
+$('toggleType').addEventListener('click', () => { const f = $('typed'); f.hidden = !f.hidden; if (!f.hidden) $('typedIn').focus(); });
+$('typed').addEventListener('submit', e => {
+  e.preventDefault(); const v = $('typedIn').value.trim(); if (!v) return;
+  $('typedIn').value = ''; pendingPos = positionNow(); handleText([v]);
+});
+
+// ---- Rendu ----
+function computeHoles(){
+  const holes = new Map();
+  round.events.forEach(e => { if (!holes.has(e.hole)) holes.set(e.hole, []); holes.get(e.hole).push(e); });
+  const result = [];
+  [...holes.keys()].sort((a,b) => a-b).forEach(h => {
+    const ev = holes.get(h);
+    const shots = ev.filter(e => e.type === 'shot').map(s => ({ ...s, dist: null }));
+    // distance d'un coup = position du coup -> prochaine annonce géolocalisée du même trou
+    const seq = ev.filter(e => e.lat != null);
+    shots.forEach(s => {
+      if (s.lat == null) return;
+      const i = seq.findIndex(e => e.id === s.id);
+      const next = seq[i + 1];
+      if (next) s.dist = Math.round(haversine(s, next));
+    });
+    const end = ev.find(e => e.type === 'end');
+    const notes = ev.filter(e => e.type === 'note');
+    result.push({ hole: h, shots, notes, score: end ? end.score : shots.length, putts: (end?.putts ?? shots.filter(s => s.club === 'Putter').length) || null, ended: !!end });
+  });
+  return result;
+}
+
+function render(){
+  const h = currentHole();
+  $('bHole').textContent = h;
+  $('bStroke').textContent = shotsOn(h).length + 1;
+
+  // journal
+  const list = $('logList'); list.innerHTML = '';
+  $('logEmpty').hidden = round.events.length > 0;
+  [...round.events].reverse().forEach(e => {
+    const li = document.createElement('li');
+    const n = document.createElement('div'); n.className = 'n';
+    n.innerHTML = `T${e.hole}<small>${new Date(e.t).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}</small>`;
+    const d = document.createElement('div'); d.className = 'desc';
+    const b = document.createElement('b'); b.textContent = describe(e);
+    const r = document.createElement('div'); r.className = 'muted'; r.textContent = '« ' + e.raw + ' »' + (e.lat == null ? ' · sans GPS' : '');
+    d.append(b, r);
+    const del = document.createElement('button'); del.textContent = 'Supprimer';
+    del.onclick = () => { round.events = round.events.filter(x => x.id !== e.id); save(); render(); };
+    li.append(n, d, del); list.append(li);
+  });
+
+  // compte rendu
+  $('course').value = round.course || '';
+  const holes = computeHoles();
+  const body = $('reportBody'); body.innerHTML = '';
+  if (!holes.length){ body.innerHTML = '<p class="muted">Le compte rendu apparaît dès la première annonce.</p>'; return; }
+
+  const total = holes.reduce((s, x) => s + x.score, 0);
+  const putts = holes.reduce((s, x) => s + (x.putts || 0), 0);
+  const d = new Date(round.date);
+  body.insertAdjacentHTML('beforeend', `<h2>${esc(round.course || 'Partie')} <span class="muted" style="font-size:18px;font-weight:500">${d.toLocaleDateString('fr-CH')}</span></h2>
+    <div class="summary"><div><b>${holes.length}</b><small>trous</small></div><div><b>${total}</b><small>coups</small></div><div><b>${putts || '–'}</b><small>putts</small></div></div>`);
+
+  // stats par club
+  const clubs = {};
+  holes.forEach(x => x.shots.forEach(s => {
+    if (!s.club || s.club === 'Putter' || s.dist == null) return;
+    (clubs[s.club] ||= []).push(s.dist);
+  }));
+  const names = Object.keys(clubs).sort((a,b) => avg(clubs[b]) - avg(clubs[a]));
+  if (names.length){
+    const maxAvg = Math.max(...names.map(n => Math.max(...clubs[n])));
+    let rows = names.map(n => { const v = clubs[n], a = Math.round(avg(v));
+      return `<tr><td>${esc(n)}<div class="track"><div class="fill" style="width:${Math.round(a / maxAvg * 100)}%"></div></div></td>
+        <td class="num">${a} m</td><td class="num muted">${Math.min(...v)}–${Math.max(...v)}</td><td class="num muted">${v.length}×</td></tr>`; }).join('');
+    body.insertAdjacentHTML('beforeend', `<h2>Distances par club</h2><div class="hole clubs"><div class="scroll"><table>
+      <tr><th>Club</th><th style="text-align:right">Moyenne</th><th style="text-align:right">Écart</th><th style="text-align:right">Coups</th></tr>${rows}</table></div></div>`);
+  }
+
+  body.insertAdjacentHTML('beforeend', '<h2>Trou par trou</h2>');
+  holes.forEach(x => {
+    const rows = x.shots.map(s => `<tr><td class="num" style="text-align:left">${s.stroke}</td><td>${esc(s.club || '–')}</td>
+      <td class="num">${s.dist != null ? s.dist + ' m' : '–'}</td><td>${esc(s.raw)}</td></tr>`).join('');
+    const notes = x.notes.map(n => `<tr><td></td><td class="muted">Note</td><td></td><td>${esc(n.raw)}</td></tr>`).join('');
+    body.insertAdjacentHTML('beforeend', `<div class="hole"><header><h3>Trou ${x.hole}</h3>
+      <span><span class="score">${x.score}</span> <span class="muted">${x.ended ? 'coups' : 'coups, en cours'}${x.putts ? ' · ' + x.putts + ' putts' : ''}</span></span></header>
+      <div class="scroll"><table><tr><th>Coup</th><th>Club</th><th style="text-align:right">Distance</th><th>Annonce</th></tr>${rows}${notes}</table></div></div>`);
+  });
+}
+const avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---- Navigation, export ----
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-selected', x === b));
+  ['play', 'log', 'report'].forEach(v => $(v).hidden = v !== b.dataset.view);
+  $('play').style.display = b.dataset.view === 'play' ? 'flex' : 'none';
+}));
+$('course').addEventListener('change', e => { round.course = e.target.value.trim(); save(); render(); });
+
+function download(name, text, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name; document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const stamp = () => new Date(round.date).toISOString().slice(0, 10) + (round.course ? '-' + round.course.replace(/\W+/g, '-') : '');
+$('expJson').onclick = () => download(`partie-${stamp()}.json`, JSON.stringify(round, null, 2), 'application/json');
+$('expCsv').onclick = () => {
+  const dist = {}; computeHoles().forEach(h => h.shots.forEach(s => dist[s.id] = s.dist));
+  const lines = [['date','parcours','trou','type','coup','club','distance_m','score','putts','lat','lon','precision_m','annonce'].join(';')];
+  round.events.forEach(e => lines.push([new Date(e.t).toISOString(), round.course, e.hole, e.type, e.stroke ?? '', e.club ?? '',
+    dist[e.id] ?? '', e.score ?? '', e.putts ?? '', e.lat ?? '', e.lon ?? '', e.acc != null ? Math.round(e.acc) : '',
+    '"' + String(e.raw).replace(/"/g, '""') + '"'].join(';')));
+  download(`partie-${stamp()}.csv`, '\ufeff' + lines.join('\n'), 'text/csv');
+};
+$('imp').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const r = JSON.parse(await f.text()); if (!Array.isArray(r.events)) throw 0;
+    if (round.events.length && !confirm('Remplacer la partie en cours par le fichier importé ?')) return;
+    round = r; save(); render(); } catch(err){ alert('Ce fichier n\'est pas une partie exportée par Caddie.'); }
+  e.target.value = '';
+});
+$('newRound').onclick = () => {
+  if (round.events.length && !confirm('Commencer une nouvelle partie ? Pense à exporter celle-ci avant.')) return;
+  round = blank(); save(); render();
+  document.querySelector('nav button[data-view="play"]').click();
+};
+
+// ---- Démarrage ----
+render(); startWatch();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

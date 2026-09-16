@@ -1,0 +1,14 @@
+{
+  "name": "Caddie – notes de golf à la voix",
+  "short_name": "Caddie",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBFCF8",
+  "theme_color": "#123A2B",
+  "lang": "fr",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
