@@ -330,6 +330,8 @@ function apply(cmd, pos){
   if (cmd.type === 'shot'){
     ev.stroke = cmd.stroke ?? (shotsOn(hole).length + 1);
     ev.club = cmd.club;
+  } else if (cmd.type === 'note'){
+    ev.stroke = shotsOn(hole).length || null;   // la note se rapporte au dernier coup joué
   } else if (cmd.type === 'end'){
     ev.score = cmd.score ?? (cmd.putts ? shotsOn(hole).filter(s => s.club !== 'Putter').length + cmd.putts : shotsOn(hole).length);
     ev.putts = cmd.putts;
@@ -342,7 +344,7 @@ function apply(cmd, pos){
   if (ev.lat == null) detail = 'Pas de position GPS pour cette annonce';
   const speak = ev.type === 'shot' ? `Trou ${hole}, coup ${ev.stroke}${ev.club ? ', ' + ev.club.replace(/^PW$/, 'pitching').replace(/^GW$/, 'gap wedge').replace(/^SW$/, 'sand wedge').replace(/^LW$/, 'lob wedge') : ''}${dist != null && prev?.type === 'shot' ? ', précédent ' + dist + ' mètres' : ''}`
     : ev.type === 'end' ? `Trou ${hole} en ${ev.score}`
-    : ev.type === 'green' ? `Trou ${hole}, sur le green${dist != null ? ', ' + dist + ' mètres' : ''}` : `Trou ${hole}, note enregistrée`;
+    : ev.type === 'green' ? `Trou ${hole}, sur le green${dist != null ? ', ' + dist + ' mètres' : ''}` : `Trou ${hole}${ev.stroke ? ', coup ' + ev.stroke : ''}, note enregistrée`;
   return { title: describe(ev), detail, speak };
 }
 function previousWithPos(h){
@@ -358,7 +360,7 @@ function describe(e){
   if (e.type === 'shot') return `Trou ${e.hole}, coup ${e.stroke}${e.club ? ' · ' + e.club : ''}`;
   if (e.type === 'end') return `Trou ${e.hole} terminé en ${e.score}${e.putts ? ' (' + e.putts + ' putts)' : ''}`;
   if (e.type === 'green') return `Trou ${e.hole} · sur le green`;
-  return `Trou ${e.hole} · note`;
+  return `Trou ${e.hole}${e.stroke ? ', coup ' + e.stroke : ''} · note`;
 }
 
 // ---- Voix ----
@@ -490,7 +492,7 @@ function computeHoles(){
     const ev = holes.get(h);
     const shots = ev.filter(e => e.type === 'shot').map(s => ({ ...s, dist: null }));
     // distance d'un coup = position du coup -> prochaine annonce géolocalisée du même trou
-    const seq = ev.filter(e => e.lat != null);
+    const seq = ev.filter(e => e.lat != null && e.type !== 'note');   // les notes ne coupent pas la mesure
     shots.forEach(s => {
       if (s.lat == null) return;
       const i = seq.findIndex(e => e.id === s.id);
@@ -557,7 +559,7 @@ function render(){
   holes.forEach(x => {
     const rows = x.shots.map(s => `<tr><td class="num" style="text-align:left">${s.stroke}</td><td>${esc(s.club || '–')}</td>
       <td class="num">${s.dist != null ? s.dist + ' m' : '–'}</td><td>${esc(s.raw)}</td></tr>`).join('');
-    const notes = x.notes.map(n => `<tr><td></td><td class="muted">Note</td><td></td><td>${esc(n.raw)}</td></tr>`).join('');
+    const notes = x.notes.map(n => `<tr><td class="num muted" style="text-align:left">${n.stroke || ''}</td><td class="muted">Note</td><td></td><td>${esc(n.raw)}</td></tr>`).join('');
     body.insertAdjacentHTML('beforeend', `<div class="hole"><header><h3>Trou ${x.hole}</h3>
       <span><span class="score">${x.score}</span> <span class="muted">${x.ended ? 'coups' : 'coups, en cours'}${x.putts ? ' · ' + x.putts + ' putts' : ''}</span></span></header>
       <div class="scroll"><table><tr><th>Coup</th><th>Club</th><th style="text-align:right">Distance</th><th>Annonce</th></tr>${rows}${notes}</table></div></div>`);
