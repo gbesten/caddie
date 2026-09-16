@@ -170,7 +170,7 @@ td.num{font-family:var(--display);font-size:19px;font-weight:600;white-space:now
       <h2>Annonces reconnues</h2>
       <p><code>Drive trou 1</code> démarre le trou 1 au driver.</p>
       <p><code>Deuxième coup fer 7 rough à gauche</code> note le coup, le club et tout ce que tu dis.</p>
-      <p><code>Bois 3</code>, <code>hybride 4</code>, <code>pitching</code>, <code>sand</code>, <code>56 degrés</code>, <code>putt</code> : le numéro de coup suit automatiquement.</p>
+      <p><code>Bois 3</code>, <code>hybride 4</code>, <code>pitching</code>, <code>sand</code>, <code>56 degrés</code>, <code>putt</code> ou <code>putter</code> : le numéro de coup suit automatiquement.</p>
       <p><code>Sur le green</code> mesure l'approche sans compter de coup.</p>
       <p><code>Trou terminé en 5, deux putts</code> clôt le trou ; le suivant commence au prochain drive.</p>
       <p><code>Balle perdue</code> ou toute autre phrase sans club est gardée comme note.</p>
@@ -209,7 +209,7 @@ function parseCommand(raw) {
   let m = t.match(/\btrou (?:numero |n )?(\d{1,2})\b/);
   if (m) r.hole = +m[1];
 
-  m = t.match(/\b(\d) putts?\b/);
+  m = t.match(/\b(\d) (?:putts?|putter|puteur|putteur|pouter|puts?|pute|putes|poutte|poutre|roule|roulee|rouler|rouler)\b/);
   if (m) r.putts = +m[1];
 
   m = t.match(/\b(?:termine|terminee|fini|finit|finie|sorti|sortie|fait)\w* (?:en )?(\d{1,2})\b/)
@@ -218,7 +218,7 @@ function parseCommand(raw) {
   if (m && (endWords || /coups?\b/.test(t))) r.score = +m[1];
   if (r.score !== null || endWords) { r.type = 'end'; return r; }
 
-  m = t.match(/\bcoup (\d{1,2})\b/) || t.match(/\b(\d{1,2})e coup\b/) || t.match(/\b(\d{1,2})e (?=(?:au |a |avec )?(?:fer|bois|driver|drive|hybride|putt|wedge|pitch|sand|lob|gap))/);
+  m = t.match(/\bcoup (\d{1,2})\b/) || t.match(/\b(\d{1,2})e coup\b/) || t.match(/\b(\d{1,2})e (?=(?:au |a |avec )?(?:fer|bois|driver|drive|hybride|putt|pute|put|putter|roule|wedge|pitch|sand|lob|gap))/);
   if (m) r.stroke = +m[1];
 
   const clubRules = [
@@ -233,7 +233,7 @@ function parseCommand(raw) {
     [/\b(gap|gw|approach wedge|aw)\b/, () => 'GW'],
     [/\b(sand|sandwedge|sw)\b/, () => 'SW'],
     [/\b(lob|lw)\b/, () => 'LW'],
-    [/\bputt(er|s)?\b/, () => 'Putter'],
+    [/\b(?:putts?|putter|puteur|putteur|pouter|puts?|pute|putes|poutte|poutre|roule|roulee|rouler|rouler)\b/, () => 'Putter'],
     [/\bwedge\b/, () => 'Wedge']
   ];
   for (const [re, fn] of clubRules) { const x = t.match(re); if (x) { r.club = fn(x); break; } }
@@ -376,6 +376,19 @@ function setListening(on){
 async function handleText(alternatives){
   let chosen = null;
   for (const a of alternatives){ const c = parseCommand(a); if (c.type !== 'note'){ chosen = c; break; } }
+  if (!chosen){
+    // Variantes ambiguës de « putt » (peut, pot, but…) acceptées seulement si l'on est déjà sur le green
+    const WEAK = /\b(peut|pot|pote|pots|but|bute|butte|boot|pull|poule|poot|put|pat|patte|pot)\b/;
+    const h = currentHole(), last = round.events[round.events.length - 1];
+    const onGreen = last && last.hole === h && (last.type === 'green' || (last.type === 'shot' && last.club === 'Putter'));
+    for (const a of alternatives){
+      const t = normalize(a);
+      if (onGreen && t.split(' ').length <= 4 && WEAK.test(t)){
+        chosen = { raw: a, text: t, type: 'shot', hole: null, stroke: null, club: 'Putter', score: null, putts: null };
+        break;
+      }
+    }
+  }
   if (!chosen) chosen = parseCommand(alternatives[0]);
   const pos = await (pendingPos || positionNow());
   pendingPos = null;
