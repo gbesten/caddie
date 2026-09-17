@@ -177,6 +177,7 @@ td.num{font-family:var(--display);font-size:19px;font-weight:600;white-space:now
       <p><code>Trou terminé en 5, deux putts</code> clôt le trou ; le suivant commence au prochain drive. <code>Deux putts</code> seul clôt aussi le trou en ajoutant les putts aux coups notés.</p>
       <p><code>Balle perdue</code> ou toute autre phrase sans club est gardée comme note.</p>
       <p><code>Annule</code> supprime la dernière annonce.</p>
+      <p>Les transcriptions fautives courantes sont rattrapées : <code>F7</code>, <code>R8</code>, <code>CR7</code>, <code>faire de</code>, <code>faire un oeuf</code>, <code>moi 3</code>, <code>il va âtre 4</code>.</p>
       <p>Avec <b>Écouteurs : on</b>, un pincement sur l'AirPod lance l'écoute et deux pincements annulent la dernière annonce.</p>
     </div>
   </section>
@@ -204,6 +205,7 @@ function normalize(s) {
     (_, d, u) => String(TENS[d] + (u ? UNITS[u] : 0)));
   t = t.replace(/\b[a-z]+\b/g, w => ORD[w] ? ORD[w] + 'e' : (NUM[w] !== undefined ? String(NUM[w]) : w));
   t = t.replace(/\b(\d{1,2}) ?(er|ere|e|eme|ieme|nd|nde)\b/g, '$1e');
+  t = t.replace(/\b1 (?:oeuf|oeufs|neuf)\b/g, '9');   // « un oeuf » mal transcrit pour « neuf »
   return t;
 }
 
@@ -231,10 +233,13 @@ function parseCommand(raw) {
 
   const clubRules = [
     [/\bdriv(e|er)\b/, () => 'Driver'],
-    [/\bbois (\d)\b/, x => 'Bois ' + x[1]],
-    [/\b(?:hybride|hybrid|rescue) (\d)\b/, x => 'Hybride ' + x[1]],
+    [/\b(?:bois|boit|boa|moi|mois|moise|noix|voix|voie|bwa|boire) ?([1-9])\b/, x => 'Bois ' + x[1]],
+    [/\b(?:hybride|hybrid|hybrides|rescue|ibrid\w*|ybride) ?([1-9])\b/, x => 'Hybride ' + x[1]],
+    [/\b(?:il |elle )?(?:va |vas )?(?:atre|etre|entre|hetre) ?([1-9])\b/, x => 'Hybride ' + x[1]],
     [/\b(?:hybride|hybrid|rescue)\b/, () => 'Hybride'],
-    [/\b(?:fer|faire|fair|ferre) (\d)\b/, x => 'Fer ' + x[1]],
+    [/\b(?:fer|faire|fair|ferre|fere|ferai|ferais) ?([1-9])\b/, x => 'Fer ' + x[1]],
+    [/\b(?:fer|faire|fair|ferre) (?:de|d)\b/, () => 'Fer 2'],
+    [/\b(?:f|ef|aife|r|air|aire|ere|erre|cr|c r|kr|qr) ?([1-9])\b/, x => 'Fer ' + x[1]],
     [/\bwedge (\d{2})\b/, x => 'Wedge ' + x[1]],
     [/\b(\d{2}) degres?\b/, x => 'Wedge ' + x[1]],
     [/\b(4[6-9]|5\d|6[0-4])\b(?! ?(?:m|metres?|yards?|yds?|pas|pieds?|cm|%|km))/, x => 'Wedge ' + x[1]],
