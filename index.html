@@ -73,6 +73,7 @@ nav button[aria-selected="true"]{background:var(--ink);color:var(--paper);border
 .tools{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .tools button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .tools button{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px;font-weight:500}
+.version{margin:8px 2px 0;font-size:13px;color:var(--pencil);text-align:right;letter-spacing:.3px}
 .typed{display:flex;gap:8px;margin-top:8px}
 .typed input{flex:1;min-width:0;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 12px}
 .typed button{border:0;background:var(--ink);color:var(--paper);border-radius:10px;padding:0 14px;font-weight:600}
@@ -145,6 +146,7 @@ td.num{font-family:var(--display);font-size:19px;font-weight:600;white-space:now
       <button id="buds" aria-pressed="false">Écouteurs : off</button>
       <button id="toggleType">Clavier</button>
     </div>
+    <p class="version" id="version">version 260917 20:29</p>
     <form class="typed" id="typed" hidden>
       <input id="typedIn" placeholder="ex. deuxième coup fer 7 rough gauche" autocomplete="off">
       <button type="submit">Noter</button>
